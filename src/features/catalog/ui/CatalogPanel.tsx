@@ -50,6 +50,7 @@ export function CatalogPanel({
           <PuzzleCard
             key={p.id}
             puzzle={p}
+            index={puzzles.indexOf(p)}
             session={document.sessions[p.id]}
             selected={document.activeId === p.id}
             onOpen={() => onOpen(p.id)}

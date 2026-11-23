@@ -1,4 +1,5 @@
-import type { Puzzle } from "../../../shared/types";
+import type { Puzzle, Tint } from "../../../shared/types";
+
 function make(
   id: string,
   title: string,
@@ -13,10 +14,36 @@ function make(
     level,
     collection,
     color,
+    tints: [color],
+    mode: "mono",
     size: rows.length,
     solution: rows.join("").split("").map(Number),
   };
 }
+
+// 彩色题：字符 0 为空格，1..k 对应 tints 下标（语义色身份，永不合并）。
+function makeColor(
+  id: string,
+  title: string,
+  level: Puzzle["level"],
+  collection: string,
+  tints: string[],
+  rows: string[],
+): Puzzle {
+  const solution: Tint[] = rows.join("").split("").map(Number);
+  return {
+    id,
+    title,
+    level,
+    collection,
+    tints,
+    mode: "color",
+    color: tints[0],
+    size: rows.length,
+    solution,
+  };
+}
+
 export const puzzles: Puzzle[] = [
   make("bloom", "窗边的花", "进阶", "植物来信", "#718baf", [
     "0000000000",
@@ -85,7 +112,40 @@ export const puzzles: Puzzle[] = [
     "011111111110000",
     "111111111111111",
   ]),
+  // —— 彩色数织：同色连续段须隔空，异色可相接 ——
+  makeColor("tulip", "窗前郁金香", "入门", "植物来信", ["#cf7a86", "#7fa08c"], [
+    "01010",
+    "11111",
+    "01110",
+    "00200",
+    "02220",
+  ]),
+  makeColor(
+    "balloon",
+    "远行的气球",
+    "进阶",
+    "小小日常",
+    ["#d98077", "#e0b96a", "#7b97c4"],
+    [
+      "0011100",
+      "0112110",
+      "1112111",
+      "1122211",
+      "0111110",
+      "0003000",
+      "0003000",
+    ],
+  ),
+  makeColor("apple", "一颗苹果", "入门", "小小日常", ["#d4776f", "#7e9a8e"], [
+    "002000",
+    "012100",
+    "111110",
+    "111110",
+    "111110",
+    "011100",
+  ]),
 ];
+
 export function findPuzzle(id: string): Puzzle {
   return puzzles.find((p) => p.id === id) ?? puzzles[0];
 }

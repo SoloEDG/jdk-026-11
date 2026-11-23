@@ -12,16 +12,22 @@ import { BoardPanel } from "../features/board";
 import { AssistPanel } from "../features/assist";
 import { JournalPanel } from "../features/journal";
 import { GalleryPanel } from "../features/gallery";
+import { VisionPanel } from "../features/vision";
 import { useGame } from "./useGame";
+
 export function App() {
   const game = useGame();
   const [page, setPage] = useState<"play" | "gallery">("play");
   const [resetting, setResetting] = useState(false);
+  // 棋盘上的辅助色视图开关；仅在存在已确认映射时生效，不影响解题数据。
+  const [boardAssist, setBoardAssist] = useState(false);
   const open = (id: string) => {
     game.dispatch({ type: "open", id });
     game.clearMessage();
+    setBoardAssist(false);
     setPage("play");
   };
+  const visionMapping = game.document.vision[game.puzzle.id];
   return (
     <div className="app-shell">
       <nav className="rail">
@@ -80,21 +86,40 @@ export function App() {
               <div className="workspace">
                 <CatalogPanel document={game.document} onOpen={open} />
                 <BoardPanel
+                  key={game.puzzle.id}
                   puzzle={game.puzzle}
                   session={game.session}
-                  onMark={(index, mark) =>
-                    game.dispatch({ type: "mark", index, mark })
+                  visionMapping={visionMapping}
+                  assistView={boardAssist}
+                  onMark={(index, mark, tint) =>
+                    game.dispatch({ type: "mark", index, mark, tint })
                   }
                   onUndo={() => game.dispatch({ type: "undo" })}
                   onReset={() => setResetting(true)}
                 />
-                <AssistPanel
-                  puzzle={game.puzzle}
-                  session={game.session}
-                  message={game.message}
-                  onHint={game.hint}
-                  onCheck={game.check}
-                />
+                <div className="assist-column">
+                  {game.puzzle.mode === "color" && (
+                    <VisionPanel
+                      key={game.puzzle.id}
+                      puzzle={game.puzzle}
+                      confirmed={visionMapping}
+                      assistView={boardAssist}
+                      onToggleView={() => setBoardAssist((v) => !v)}
+                      onConfirm={game.confirmVision}
+                      onClear={() => {
+                        game.clearVision();
+                        setBoardAssist(false);
+                      }}
+                    />
+                  )}
+                  <AssistPanel
+                    puzzle={game.puzzle}
+                    session={game.session}
+                    message={game.message}
+                    onHint={game.hint}
+                    onCheck={game.check}
+                  />
+                </div>
               </div>
               <div className="bottom-row">
                 <JournalPanel
@@ -137,6 +162,7 @@ export function App() {
             <GalleryPanel
               document={game.document}
               puzzles={puzzles}
+              vision={game.document.vision}
               onOpen={open}
             />
           )}

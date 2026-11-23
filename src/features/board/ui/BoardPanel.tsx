@@ -1,33 +1,57 @@
 import { useState } from "react";
 import { Clock3, CheckCircle2, MousePointer2 } from "lucide-react";
-import { clueSet } from "../../../shared/clues";
-import type { Puzzle, Session, Tool } from "../../../shared/types";
+import { clueSet, colorClueSet } from "../../../shared/clues";
+import type { Puzzle, Session, Tool, VisionMapping } from "../../../shared/types";
 import { completion } from "../../../shared/document";
 import { lineStatuses } from "../lib/lineStatus";
-import { BoardToolbar } from "./BoardToolbar";
+import { BoardToolbar, type BoardTool } from "./BoardToolbar";
 import { Clue } from "./Clue";
+import { assistedStyle, originalStyle, hasConfirmedMapping } from "../../vision";
+
 export function BoardPanel({
   puzzle,
   session,
+  visionMapping,
+  assistView,
   onMark,
   onUndo,
   onReset,
 }: {
   puzzle: Puzzle;
   session: Session;
-  onMark: (i: number, t: Tool) => void;
+  visionMapping?: VisionMapping;
+  assistView: boolean;
+  onMark: (i: number, mark: Tool, tint: number) => void;
   onUndo: () => void;
   onReset: () => void;
 }) {
-  const [tool, setTool] = useState<Tool>("filled");
-  const clues = clueSet(puzzle.size, puzzle.solution);
-  const statuses = lineStatuses(puzzle, session.marks);
+  const [tool, setTool] = useState<BoardTool>({ kind: "filled", tint: 1 });
+  const isColor = puzzle.mode === "color";
+  const monoClues = clueSet(puzzle.size, puzzle.solution);
+  const colorClues = colorClueSet(puzzle.size, puzzle.solution);
+  const statuses = lineStatuses(puzzle, session.marks, session.tints);
+
+  // 渲染层：只有已确认映射才启用辅助色；未确认时一律原色，草稿不污染外观。
+  const useAssisted = assistView && hasConfirmedMapping(visionMapping);
+  const cellStyle = (tint: number) =>
+    useAssisted
+      ? assistedStyle(puzzle, tint, visionMapping)
+      : originalStyle(puzzle, tint);
+
+  const place = (i: number) => {
+    const sameMark = session.marks[i] === tool.kind;
+    const sameTint = session.tints[i] === (tool.kind === "filled" ? tool.tint : 0);
+    if (sameMark && sameTint) onMark(i, "unknown", 0);
+    else onMark(i, tool.kind, tool.tint);
+  };
+
   return (
     <section className="board-panel panel">
       <div className="board-heading">
         <div>
           <span className="eyebrow">
             A LITTLE DISCOVERY · {puzzle.collection}
+            {isColor ? " · 彩色数织" : ""}
           </span>
           <h1>
             {session.solved ? puzzle.title : "一格一格，拼出惊喜"}
@@ -43,7 +67,9 @@ export function BoardPanel({
         </div>
       </div>
       <BoardToolbar
+        puzzle={puzzle}
         tool={tool}
+        swatch={(tint) => cellStyle(tint)}
         onTool={setTool}
         onUndo={onUndo}
         onReset={onReset}
@@ -62,34 +88,51 @@ export function BoardPanel({
             <span>
               {puzzle.size}×{puzzle.size}
             </span>
-            <small>NONOGRAM</small>
+            <small>{isColor ? "COLOR NONOGRAM" : "NONOGRAM"}</small>
           </div>
-          {clues.slice(puzzle.size).map((v, i) => (
+          {Array.from({ length: puzzle.size }, (_, c) => (
             <Clue
-              key={"c" + i}
-              values={v}
-              done={statuses[puzzle.size + i]}
+              key={"c" + c}
+              values={monoClues[puzzle.size + c]}
+              colorRuns={isColor ? colorClues[puzzle.size + c] : undefined}
+              done={statuses[puzzle.size + c]}
               vertical
+              puzzle={puzzle}
+              cellStyle={cellStyle}
             />
           ))}
           {Array.from({ length: puzzle.size }, (_, row) => (
             <div className="grid-row" key={row}>
-              <Clue values={clues[row]} done={statuses[row]} />
+              <Clue
+                values={monoClues[row]}
+                colorRuns={isColor ? colorClues[row] : undefined}
+                done={statuses[row]}
+                puzzle={puzzle}
+                cellStyle={cellStyle}
+              />
               {Array.from({ length: puzzle.size }, (_, col) => {
                 const i = row * puzzle.size + col;
                 const mark = session.marks[i];
+                const tint = session.tints[i];
+                const fillStyle =
+                  mark === "filled" ? cellStyle(tint) : undefined;
                 return (
                   <button
                     key={col}
-                    aria-label={`第${row + 1}行第${col + 1}列 ${mark === "filled" ? "已填" : mark === "cross" ? "标空" : "未知"}`}
+                    aria-label={`第${row + 1}行第${col + 1}列 ${
+                      mark === "filled"
+                        ? `已填语义色${tint}`
+                        : mark === "cross"
+                          ? "标空"
+                          : "未知"
+                    }`}
                     className={`cell ${mark} ${(col + 1) % 5 === 0 ? "major-right" : ""} ${(row + 1) % 5 === 0 ? "major-bottom" : ""}`}
+                    style={fillStyle}
                     disabled={session.solved}
-                    onClick={() =>
-                      onMark(i, session.marks[i] === tool ? "unknown" : tool)
-                    }
+                    onClick={() => place(i)}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      onMark(i, mark === "cross" ? "unknown" : "cross");
+                      onMark(i, mark === "cross" ? "unknown" : "cross", 0);
                     }}
                   >
                     {mark === "cross" ? "×" : ""}
@@ -102,7 +145,10 @@ export function BoardPanel({
       </div>
       <div className="board-footer">
         <span>
-          <MousePointer2 size={14} /> 左键填涂 · 右键标空
+          <MousePointer2 size={14} />{" "}
+          {isColor
+            ? "左键按当前语义色填涂 · 右键标空 · 同色连续段须隔空，异色可相接"
+            : "左键填涂 · 右键标空"}
         </span>
         <span>
           <span className="status-dot" /> {statuses.filter(Boolean).length} /{" "}

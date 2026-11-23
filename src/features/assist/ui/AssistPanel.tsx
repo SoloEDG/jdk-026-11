@@ -3,6 +3,7 @@ import type { Puzzle, Session } from "../../../shared/types";
 import { HINT_LIMIT } from "../model/hints";
 import { inspect } from "../lib/inspect";
 import { RuleGuide } from "./RuleGuide";
+
 export function AssistPanel({
   puzzle,
   session,
@@ -34,7 +35,11 @@ export function AssistPanel({
             {HINT_LIMIT - session.hints} / {HINT_LIMIT}
           </span>
         </button>
-        <p className="hint-note">每次只揭示一格，不替你完成整幅图。</p>
+        <p className="hint-note">
+          {puzzle.mode === "color"
+            ? "每次只揭示一格的正确语义色，不替你完成整幅图。"
+            : "每次只揭示一格，不替你完成整幅图。"}
+        </p>
         <button
           className="check-button"
           onClick={onCheck}
@@ -47,21 +52,44 @@ export function AssistPanel({
         <div className="assist-message" role="status">
           {message || "相信你的推理，也可以随时检查。"}
         </div>
-        <div className="assist-stats">
-          <div>
-            <strong>{stats.filled}</strong>
-            <span>已填涂</span>
+        {puzzle.mode === "color" ? (
+          <div className="assist-tint-stats">
+            {puzzle.tints.map((hex, i) => {
+              const tint = i + 1;
+              return (
+                <div key={tint} className="tint-stat">
+                  <span className="tint-swatch" style={{ background: hex }} />
+                  <strong>{stats.perTint[tint] ?? 0}</strong>
+                  <span>语义色 {tint}</span>
+                </div>
+              );
+            })}
+            <div className="tint-stat">
+              <strong>{stats.crossed}</strong>
+              <span>已标空</span>
+            </div>
+            <div className="tint-stat">
+              <strong>{session.hints}</strong>
+              <span>已用提示</span>
+            </div>
           </div>
-          <div>
-            <strong>{stats.crossed}</strong>
-            <span>已标空</span>
+        ) : (
+          <div className="assist-stats">
+            <div>
+              <strong>{stats.filled}</strong>
+              <span>已填涂</span>
+            </div>
+            <div>
+              <strong>{stats.crossed}</strong>
+              <span>已标空</span>
+            </div>
+            <div>
+              <strong>{session.hints}</strong>
+              <span>已用提示</span>
+            </div>
           </div>
-          <div>
-            <strong>{session.hints}</strong>
-            <span>已用提示</span>
-          </div>
-        </div>
-        <RuleGuide />
+        )}
+        <RuleGuide mode={puzzle.mode} />
       </section>
       <section className="quiet-card">
         <Sparkles size={21} />

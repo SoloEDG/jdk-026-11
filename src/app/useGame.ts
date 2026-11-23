@@ -3,6 +3,8 @@ import { findPuzzle, puzzles } from "../features/catalog";
 import { inspect, nextHint } from "../features/assist";
 import { loadDocument, saveDocument } from "../features/journal";
 import { transition } from "./reducer";
+import type { DisplayCombo } from "../shared/types";
+
 export function useGame() {
   const [initial] = useState(() => loadDocument(puzzles));
   const [document, dispatch] = useReducer(
@@ -43,8 +45,12 @@ export function useGame() {
     const hint = nextHint(puzzle, session);
     if (hint) {
       dispatch({ type: "hint", ...hint });
+      const colorText =
+        puzzle.mode === "color" && hint.tint
+          ? `语义色 ${hint.tint} 的`
+          : "";
       setMessage(
-        `已揭示第 ${Math.floor(hint.index / puzzle.size) + 1} 行、第 ${(hint.index % puzzle.size) + 1} 列的一格。`,
+        `已揭示第 ${Math.floor(hint.index / puzzle.size) + 1} 行、第 ${(hint.index % puzzle.size) + 1} 列的一格${colorText}答案。`,
       );
     } else setMessage("本题提示额度已用完，试试检查当前标记。");
   };
@@ -53,10 +59,23 @@ export function useGame() {
     dispatch({ type: "check" });
     setMessage(
       errors
-        ? `目前有 ${errors} 处标记与答案不符。检查不会直接揭示位置。`
+        ? `目前有 ${errors} 处标记与答案不符（含颜色不对）。检查不会直接揭示位置。`
         : "已填写的标记都正确，继续你的发现吧。",
     );
   };
+  const confirmVision = (
+    entries: Record<number, DisplayCombo>,
+    locked: number[],
+  ) => {
+    dispatch({
+      type: "visionConfirm",
+      puzzleId: puzzle.id,
+      entries,
+      locked,
+    });
+  };
+  const clearVision = () =>
+    dispatch({ type: "visionClear", puzzleId: puzzle.id });
   return {
     document,
     puzzle,
@@ -67,6 +86,8 @@ export function useGame() {
     save,
     hint,
     check,
+    confirmVision,
+    clearVision,
     clearMessage: () => setMessage(""),
   };
 }
